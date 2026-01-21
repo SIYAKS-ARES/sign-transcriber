@@ -1,3 +1,175 @@
+# Transformer-SignLang (226 Sınıf) — Eğitim & İnferans Rehberi
+
+PyTorch tabanlı **Temporal Transformer** ile Türk İşaret Dili / AUTSL işaretlerini sınıflandırma. Girdi: MediaPipe Holistic keypoint dizileri (258 boyut, 200 frame). Çıktı: 226 sınıf etiketi.
+
+> Ayrıntılı eski planlar için `Docs/` klasörünü inceleyin. Bu README güncel kullanım özetidir.
+
+---
+
+## Özeti Hızlı Gör
+
+| Özellik | Değer |
+|---------|-------|
+| Mimari | Temporal Transformer Encoder |
+| Girdi | 200×258 keypoint (Pose+Face+Hands) |
+| Sınıf | 226 (AUTSL) |
+| Checkpoint | `checkpoints/best_model.pth` |
+| Normalizasyon | `Data/scaler.pkl` (train setinden) |
+| Sonuçlar | `results/` (confusion matrix, per-class metrics, test_metrics.json) |
+
+---
+
+## Kurulum
+
+```bash
+cd transformer-signlang
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# Klasörleri hazırla
+mkdir -p data/keypoints data/processed checkpoints results logs
+```
+
+GPU için PyTorch (örnek):  
+`pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118`
+
+---
+
+## Veri Hazırlama Pipeline
+
+> AUTSL benzeri dizin ve etiketlere sahip olmanız gerekir (`Data/Train Data/train`, `train_labels.csv`, `Data/Class ID/SignList_ClassId_TR_EN.csv`). Mevcut `Data/scaler.pkl` yalnızca referans içindir; kendi verinizle yeniden üretin.
+
+1) **Video seçimi**  
+`python scripts/01_select_videos.py`  
+Çıktı: `data/selected_videos_*.csv`
+
+2) **Keypoint çıkarımı (MediaPipe Holistic)**  
+`python scripts/02_extract_keypoints.py`  
+Çıktı: `data/keypoints/<video_id>.npy` (T×258)
+
+3) **Normalize + Padding**  
+`python scripts/03_normalize_data.py`  
+- Scaler yalnızca train verisinde fit edilir → `data/scaler.pkl`  
+- `data/processed/X_train.npy`, `X_val.npy`, `X_test.npy` (+ label/id dosyaları) oluşturulur.
+
+---
+
+## Eğitim
+
+```bash
+python train.py
+
+# Checkpoint'ten devam
+python train.py --resume checkpoints/last_model.pth
+python train.py --resume-from-best
+```
+
+- En iyi model: `checkpoints/best_model.pth`
+- Son model: `checkpoints/last_model.pth`
+- Early stopping (patience=10), cosine scheduler + warmup
+- Opsiyonel izleme: TensorBoard (`logs/`), wandb (train.py içinde açılabilir)
+
+---
+
+## Değerlendirme
+
+```bash
+python evaluate.py
+```
+
+Çıktılar (`results/`):
+- `test_metrics.json`
+- `confusion_matrix.png`, `confusion_matrix_normalized.png`
+- `per_class_metrics.png`
+- (varsa) `test_predictions.*`
+
+---
+
+## Hızlı İnferans
+
+Hazır checkpoint + scaler ile kısa video testi:
+
+```bash
+python inference_test_videos.py --video path/to/video.mp4
+```
+
+Script, keypoint çıkarımı ve 226 sınıf tahmini yapar (MediaPipe’ın kurulu olduğundan emin olun).
+
+---
+
+## Dizin Yapısı
+
+```
+transformer-signlang/
+├── config.py                  # Model/egitim konfigürasyonu
+├── train.py                   # Eğitim
+├── evaluate.py                # Test/değerlendirme
+├── inference_test_videos.py   # Hızlı inferans
+├── validate_setup.py          # Ortam kontrolü
+│
+├── models/
+│   └── transformer_model.py   # Temporal Transformer
+├── scripts/
+│   ├── 01_select_videos.py
+│   ├── 02_extract_keypoints.py
+│   ├── 03_normalize_data.py
+│   └── (plot/inspect/test yardımcıları)
+├── Data/
+│   └── scaler.pkl             # Normalizasyon (örnek)
+├── checkpoints/
+│   └── best_model.pth         # Eğitilmiş ağırlıklar
+├── results/
+│   ├── evaluation_report.json
+│   ├── confusion_matrix*.png/.csv
+│   ├── per_class_metrics*.
+│   └── attention/ (rollout görselleri)
+├── logs/
+└── Docs/                      # Ayrıntılı/legacy dokümanlar
+```
+
+---
+
+## Temel Parametreler (config.py)
+
+| Parametre | Varsayılan | Açıklama |
+|-----------|------------|----------|
+| INPUT_DIM | 258 | Pose+Face+Hands keypoint boyutu |
+| MAX_SEQ_LENGTH | 200 | Frame sayısı (padding/truncation) |
+| NUM_CLASSES | 226 | AUTSL sınıf sayısı |
+| D_MODEL | 256 | Transformer embedding |
+| NHEAD | 8 | Attention head sayısı |
+| NUM_ENCODER_LAYERS | 6 | Encoder blokları |
+| DIM_FEEDFORWARD | 1024 | FFN gizli boyutu |
+| DROPOUT | 0.1 | Dropout |
+| BATCH_SIZE | 32 | Batch |
+| LEARNING_RATE | 1e-4 | Başlangıç LR |
+| WARMUP_EPOCHS | 10 | LR ısınma |
+| LABEL_SMOOTHING | 0.1 | CE smoothing |
+
+---
+
+## Sorun Giderme
+
+- **CUDA OOM**: `BATCH_SIZE` düşür, `D_MODEL`/`NUM_ENCODER_LAYERS` azalt.  
+- **MediaPipe yavaş/bozuk**: `scripts/02_extract_keypoints.py` içinde `model_complexity=0`; `mediapipe==0.10.14` kurulu olsun.  
+- **Checkpoint yok**: Eğitimden sonra `checkpoints/best_model.pth` oluşur; yoksa eğitimi tamamlayın.  
+- **Veri uyumsuz**: `data/scaler.pkl` ve `data/processed/*` aynı sürümle üretilmiş olmalı; scaler yalnızca train setinde fit edilir.  
+
+---
+
+## Referans Dokümanlar
+
+- Ayrıntılı/önceki planlar: `Docs/`
+- Ekran görüntüleri: `ss/`
+- Benchmark görselleri/raporları: `results/`
+
+---
+
+**Son Güncelleme:** 2026-01-20  
+**Sürüm:** 2.0 (226 sınıf, güncel checkpoint)  
+**Yazar:** sign-transcriber ekibi
 # Transformer Tabanlı İşaret Dili Tanıma Projesi İş Planı
 
 ## 1. Proje Hedefi
