@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Oynatma Testi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        video {
+            width: 100%;
+            border: 2px solid #007bff;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🎥 Video Oynatma Testi</h1>
+    
+    <div class="status info" id="status">Video seçin...</div>
+    
+    <input type="file" id="fileInput" accept="video/*" />
+    
+    <video id="testVideo" controls></video>
+    
+    <div>
+        <button onclick="playVideo()">▶️ Oynat</button>
+        <button onclick="pauseVideo()">⏸️ Duraklat</button>
+        <button onclick="resetVideo()">🔄 Başa Sar</button>
+    </div>
+    
+    <div id="log" style="margin-top: 20px; padding: 10px; background: #f5f5f5; border-radius: 4px; font-family: monospace; font-size: 12px;"></div>
+
+    <script>
+        const video = document.getElementById('testVideo');
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status');
+        const log = document.getElementById('log');
+        
+        function addLog(message) {
+            const time = new Date().toLocaleTimeString();
+            log.innerHTML += `[${time}] ${message}<br>`;
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        addLog('Sayfa yüklendi');
+        
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                addLog(`Dosya seçildi: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+                
+                const url = URL.createObjectURL(file);
+                video.src = url;
+                
+                addLog(`Video src atandı: ${url.substring(0, 50)}...`);
+                
+                status.className = 'status success';
+                status.textContent = `✅ Video yüklendi: ${file.name}`;
+            }
+        });
+        
+        video.addEventListener('loadedmetadata', function() {
+            addLog(`✅ Video metadata yüklendi - Süre: ${video.duration.toFixed(1)}s`);
+        });
+        
+        video.addEventListener('play', function() {
+            addLog('▶️ Video oynatılıyor');
+        });
+        
+        video.addEventListener('pause', function() {
+            addLog('⏸️ Video duraklatıldı');
+        });
+        
+        video.addEventListener('error', function() {
+            addLog('❌ Video hatası: ' + video.error.message);
+            status.className = 'status error';
+            status.textContent = '❌ Video yüklenemedi';
+        });
+        
+        function playVideo() {
+            if (!video.src) {
+                alert('Önce bir video seçin!');
+                return;
+            }
+            
+            addLog('play() çağrılıyor...');
+            video.currentTime = 0;
+            video.play()
+                .then(() => {
+                    addLog('✅ play() başarılı');
+                    status.className = 'status success';
+                    status.textContent = '▶️ Video oynatılıyor';
+                })
+                .catch(err => {
+                    addLog('❌ play() hatası: ' + err.message);
+                    status.className = 'status error';
+                    status.textContent = '❌ Oynatma hatası: ' + err.message;
+                });
+        }
+        
+        function pauseVideo() {
+            video.pause();
+            status.className = 'status info';
+            status.textContent = '⏸️ Video duraklatıldı';
+        }
+        
+        function resetVideo() {
+            video.currentTime = 0;
+            addLog('🔄 Video başa sarıldı');
+        }
+    </script>
+</body>
+</html>
+

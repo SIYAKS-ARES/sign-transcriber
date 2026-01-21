@@ -1,0 +1,1034 @@
+{% extends "base.html" %}
+
+{% block title %}TİD Anlamlandırma - Demo{% endblock %}
+
+{% block extra_css %}
+<style>
+    .demo-container {
+        position: relative;
+        max-width: 640px;
+        margin: 0 auto;
+    }
+    
+    .video-container {
+        position: relative;
+        background: #000;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    
+    .prediction-overlay {
+        position: absolute;
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 16px;
+        text-align: center;
+    }
+    
+    .confidence-bar {
+        height: 4px;
+        background: #ddd;
+        border-radius: 2px;
+        margin-top: 5px;
+        overflow: hidden;
+    }
+    
+    .confidence-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #dc3545, #ffc107, #28a745);
+        transition: width 0.3s ease;
+    }
+    
+    .controls-panel {
+        background: #f8f9fa;
+        border-radius: 15px;
+        padding: 25px;
+        margin-bottom: 25px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+        animation: pulse 2s infinite;
+    }
+    
+    .status-active { background: #28a745; }
+    .status-warning { background: #ffc107; }
+    .status-error { background: #dc3545; }
+    
+    #videoElement {
+        width: 100%;
+        height: 400px;
+        object-fit: cover;
+        border-radius: 15px;
+    }
+    
+    .upload-area {
+        border: 2px dashed #dee2e6;
+        border-radius: 15px;
+        padding: 40px;
+        text-align: center;
+        background: #f8f9fa;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .upload-area:hover {
+        border-color: #007bff;
+        background: #e3f2fd;
+    }
+    
+    .upload-area.dragover {
+        border-color: #007bff;
+        background: #e3f2fd;
+        transform: scale(1.02);
+    }
+    
+    .input-method-card {
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    
+    .input-method-card:hover {
+        border-color: #007bff;
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+    }
+    
+    .input-method-card.active {
+        border-color: #007bff;
+        background: #e3f2fd;
+    }
+    
+    .result-card {
+        border-left: 4px solid #007bff;
+        background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.6; }
+        100% { opacity: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Ana Demo Alanı -->
+        <div class="col-lg-8">
+            <!-- Başlık -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2>
+                    <i class="fas fa-video text-primary"></i> TİD Çeviri Demo
+                </h2>
+                <div class="d-flex gap-2">
+                    <button id="startButton" class="btn btn-success" disabled>
+                        <i class="fas fa-play"></i> Başlat
+                    </button>
+                    <button id="stopButton" class="btn btn-danger" disabled>
+                        <i class="fas fa-stop"></i> Durdur
+                    </button>
+                    <button id="clearButton" class="btn btn-warning">
+                        <i class="fas fa-broom"></i> Temizle
+                    </button>
+                </div>
+            </div>
+
+            <!-- Girdi Yöntemi Seçimi -->
+            <div class="controls-panel">
+                <h5 class="mb-3">
+                    <i class="fas fa-cogs text-primary"></i> Girdi Yöntemi Seçin
+                </h5>
+                <div class="row g-3" id="inputMethodCards">
+                    <div class="col-md-4">
+                        <div class="card input-method-card h-100" data-method="camera">
+                            <div class="card-body text-center">
+                                <i class="fas fa-camera fa-3x text-primary mb-3"></i>
+                                <h6 class="card-title">Kamera</h6>
+                                <p class="card-text small text-muted">Gerçek zamanlı kamera akışı</p>
+                                <span class="status-indicator status-error" id="camera-status"></span>
+                                <small>Hazır değil</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card input-method-card h-100" data-method="video">
+                            <div class="card-body text-center">
+                                <i class="fas fa-video fa-3x text-success mb-3"></i>
+                                <h6 class="card-title">Video Yükle</h6>
+                                <p class="card-text small text-muted">MP4, AVI, MOV dosyaları</p>
+                                <span class="status-indicator status-warning" id="video-status"></span>
+                                <small>Video seçin</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card input-method-card h-100 active" data-method="sample">
+                            <div class="card-body text-center">
+                                <i class="fas fa-database fa-3x text-warning mb-3"></i>
+                                <h6 class="card-title">Örnek Veri</h6>
+                                <p class="card-text small text-muted">Hazır test verisi</p>
+                                <span class="status-indicator status-active" id="sample-status"></span>
+                                <small>Hazır</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dinamik İçerik Alanı -->
+            <div id="dynamicContent">
+                <!-- Kamera için -->
+                <div id="cameraContent" class="demo-container" style="display: none;">
+                    <div class="video-container">
+                        <video id="videoElement" autoplay muted playsinline>
+                            <p>Tarayıcınız video elementini desteklemiyor.</p>
+                        </video>
+                        <div class="prediction-overlay" id="predictionOverlay" style="display: none;">
+                            <div id="predictionText">Hazırlanıyor...</div>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" id="confidenceBar" style="width: 0%"></div>
+                            </div>
+                            <small id="confidenceText">Güven: 0%</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video yükleme için -->
+                <div id="videoContent" class="demo-container" style="display: none;">
+                    <div class="upload-area" id="videoUploadArea">
+                        <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-3"></i>
+                        <h5>Video Dosyası Yükleyin</h5>
+                        <p class="text-muted">Dosyayı buraya sürükleyin veya tıklayarak seçin</p>
+                        <input type="file" id="videoFileInput" accept="video/*" style="display: none;">
+                        <button class="btn btn-outline-primary" onclick="$('#videoFileInput').click()">
+                            <i class="fas fa-folder-open"></i> Dosya Seç
+                        </button>
+                    </div>
+                    <video id="uploadedVideo" controls muted style="display: none; width: 100%; border-radius: 15px; margin-top: 20px;">
+                    </video>
+                </div>
+
+                <!-- Örnek veri için -->
+                <div id="sampleContent" class="demo-container">
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h6 class="mb-0">
+                                <i class="fas fa-database"></i> Örnek Transkripsiyon Verisi
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i>
+                                <strong>Demo Modu:</strong> Bu simülasyon modunda, önceden hazırlanmış örnek bir transkripsiyon kullanılmaktadır.
+                            </div>
+                            <p class="font-monospace bg-light p-3 rounded" id="sampleTranscription">
+                                BEN ÖNCE ARABA^SÜRMEK BİLMEK^DEĞİL BEN CAHİL BEN SONRA ARKADAŞ ÖĞRETMEK ÖĞRETMEK BEN ŞİMDİ ANLAMAK ARABA^SÜRMEK SÜRMEK
+                            </p>
+                            <form method="POST" action="/translate" id="sampleForm">
+                                <input type="hidden" name="provider" value="gemini">
+                                <input type="hidden" name="input_source" value="sample">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-language"></i> Çeviriyi Başlat
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Yan Panel -->
+        <div class="col-lg-4">
+            <!-- LLM Ayarları -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-robot text-primary"></i> AI Ayarları
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="provider" class="form-label">LLM Sağlayıcı</label>
+                        <select class="form-select" id="provider" name="provider">
+                            <option value="openai" {{ 'selected' if selected_provider == 'openai' else '' }}>
+                                OpenAI GPT-4o
+                            </option>
+                            <option value="claude" {{ 'selected' if selected_provider == 'claude' else '' }}>
+                                Anthropic Claude 3.5 Sonnet
+                            </option>
+                            <option value="gemini" {{ 'selected' if selected_provider == 'gemini' else '' }}>
+                                Google Gemini 2.0 Flash
+                            </option>
+                        </select>
+                        <div class="form-text">
+                            API anahtarları .env dosyasında tanımlanmıştır.
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <label class="form-label">Sistem Durumu</label>
+                            <span class="badge bg-success">Aktif</span>
+                        </div>
+                        <div class="row g-2 text-center">
+                            <div class="col-6">
+                                <div class="border rounded p-2">
+                                    <div class="h6 mb-0 text-primary">RAG</div>
+                                    <small class="text-muted">Ön İşleme</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="border rounded p-2">
+                                    <div class="h6 mb-0 text-success">LLM</div>
+                                    <small class="text-muted">Gemini 2.0</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ceviri Sonuclari -->
+            {% if result %}
+            <div class="card result-card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-language"></i> Ceviri Sonuclari
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="text-primary">En Iyi Ceviri:</h6>
+                    <blockquote class="blockquote">
+                        <p class="fs-6">"{{ result.translation }}"</p>
+                    </blockquote>
+                    
+                    <hr>
+                    
+                    <h6 class="text-muted mb-2">Model Aciklamasi:</h6>
+                    <p class="text-muted small"><em>{{ result.explanation }}</em></p>
+                    
+                    <div class="mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span><strong>Guven Skoru:</strong></span>
+                            <span class="badge bg-{{ 'success' if result.confidence >= 8 else 'warning' if result.confidence >= 6 else 'danger' }}">
+                                {{ result.confidence }}/10
+                            </span>
+                        </div>
+                        <div class="progress mb-3">
+                            <div class="progress-bar" style="width: {{ (result.confidence / 10) * 100 }}%"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- 3 Alternatif Ceviri Gosterimi -->
+                    {% if result.alternatives and result.alternatives|length > 1 %}
+                    <hr>
+                    <h6 class="text-secondary mb-3">
+                        <i class="fas fa-list-ol"></i> Alternatif Ceviriler ({{ result.alternatives|length }} adet)
+                    </h6>
+                    {% for alt in result.alternatives %}
+                    <div class="card mb-2 {{ 'border-primary border-2' if loop.index == 1 else '' }}">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <span class="badge bg-secondary me-2">#{{ loop.index }}</span>
+                                    <span>{{ alt.translation }}</span>
+                                </div>
+                                <span class="badge bg-{{ 'success' if alt.confidence >= 8 else 'warning' if alt.confidence >= 6 else 'danger' }}">
+                                    {{ alt.confidence }}/10
+                                </span>
+                            </div>
+                            {% if alt.explanation %}
+                            <small class="text-muted d-block mt-1 ms-4">
+                                <em>{{ alt.explanation[:100] }}{% if alt.explanation|length > 100 %}...{% endif %}</em>
+                            </small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
+                    
+                    <hr>
+                    <div class="d-grid gap-2 d-md-flex">
+                        <button class="btn btn-sm btn-outline-success me-md-2" data-feedback="positive">
+                            <i class="fas fa-thumbs-up"></i> Dogru
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" data-feedback="negative">
+                            <i class="fas fa-thumbs-down"></i> Yanlis
+                        </button>
+                    </div>
+                    
+                    <hr>
+                    <small class="text-muted">
+                        <strong>Orijinal:</strong> {{ original_transcription }}
+                    </small>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Kullanım Rehberi -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-question-circle text-info"></i> Kullanım Rehberi
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="accordion" id="helpAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="cameraHelp">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cameraHelpContent">
+                                    <i class="fas fa-camera me-2"></i> Kamera Kullanımı
+                                </button>
+                            </h2>
+                            <div id="cameraHelpContent" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body">
+                                    <ol class="small">
+                                        <li>Kamera kartını seçin</li>
+                                        <li>Tarayıcı izin isteyecek, "İzin Ver" tıklayın</li>
+                                        <li>"Başlat" butonuna tıklayın</li>
+                                        <li>İşaret yapın ve sonuçları görün</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="videoHelp">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#videoHelpContent">
+                                    <i class="fas fa-video me-2"></i> Video Yükleme
+                                </button>
+                            </h2>
+                            <div id="videoHelpContent" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body">
+                                    <ol class="small">
+                                        <li>Video kartını seçin</li>
+                                        <li>Dosyayı sürükleyin veya "Dosya Seç" tıklayın</li>
+                                        <li>MP4, AVI, MOV formatları desteklenir</li>
+                                        <li>Video yüklendikten sonra "Başlat" tıklayın</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="sampleHelp">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#sampleHelpContent">
+                                    <i class="fas fa-database me-2"></i> Örnek Veri
+                                </button>
+                            </h2>
+                            <div id="sampleHelpContent" class="accordion-collapse collapse show" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body">
+                                    <ol class="small">
+                                        <li>Örnek veri kartı varsayılan olarak seçilidir</li>
+                                        <li>"Çeviriyi Başlat" butonuna tıklayın</li>
+                                        <li>AI anında çeviri yapacaktır</li>
+                                        <li>Sonuçları ve güven skorunu inceleyin</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Global değişkenler
+let currentMethod = 'sample';
+let videoStream = null;
+let isProcessing = false;
+let capturedFrames = [];
+let frameBuffer = [];
+const MAX_FRAMES = 60; // 5 FPS * 12 saniye = 60 frame
+let recordingStartTime = null;
+let isLiveRequestInFlight = false;
+const LIVE_SEND_INTERVAL_MS = 1500; // canli tahminleri asiri sik gondermeyelim
+let lastLiveSentTs = 0;
+
+$(document).ready(function() {
+    setupEventListeners();
+    updateUI();
+});
+
+function setupEventListeners() {
+    // Girdi yöntemi seçimi
+    $('.input-method-card').on('click', function() {
+        const method = $(this).data('method');
+        selectInputMethod(method);
+    });
+    
+    // Ana kontroller
+    $('#startButton').click(startDemo);
+    $('#stopButton').click(stopDemo);
+    $('#clearButton').click(clearResults);
+    
+    // Video dosyası seçimi
+    $('#videoFileInput').on('change', handleVideoUpload);
+    
+    // Drag & drop
+    $('#videoUploadArea').on('dragover', function(e) {
+        e.preventDefault();
+        $(this).addClass('dragover');
+    }).on('dragleave', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+    }).on('drop', function(e) {
+        e.preventDefault();
+        $(this).removeClass('dragover');
+        const files = e.originalEvent.dataTransfer.files;
+        if (files.length > 0) {
+            handleVideoFile(files[0]);
+        }
+    });
+    
+    // Geri bildirim butonları
+    $('[data-feedback]').on('click', function() {
+        const feedback = $(this).data('feedback');
+        const isPositive = feedback === 'positive';
+        
+        TID.showToast('Teşekkürler', 
+            `${isPositive ? 'Olumlu' : 'Olumsuz'} geri bildiriminiz kaydedildi`, 
+            'success', 3000);
+        
+        // Butonları devre dışı bırak
+        $('[data-feedback]').prop('disabled', true);
+        $(this).removeClass('btn-outline-success btn-outline-danger')
+               .addClass(isPositive ? 'btn-success' : 'btn-danger');
+    });
+    
+    // Form submit
+    $('#sampleForm').on('submit', function() {
+        TID.showToast('Bilgi', 'Çeviri işlemi başlatılıyor...', 'info', 3000);
+    });
+}
+
+function selectInputMethod(method) {
+    currentMethod = method;
+    
+    // Kartları güncelle
+    $('.input-method-card').removeClass('active');
+    $(`.input-method-card[data-method="${method}"]`).addClass('active');
+    
+    // İçeriği göster/gizle
+    $('#dynamicContent > div').hide();
+    $(`#${method}Content`).show();
+    
+    // Kamera seçildiyse durum göstergesini güncelle
+    if (method === 'camera') {
+        updateStatus('camera-status', 'warning', 'İzin bekleniyor');
+    }
+
+    updateUI();
+}
+
+function updateUI() {
+    // Başlat butonu durumu
+    let canStart = false;
+    
+    switch(currentMethod) {
+        case 'camera':
+            canStart = true; // Kamera için Start ile izin iste
+            break;
+        case 'video':
+            canStart = $('#uploadedVideo')[0] && $('#uploadedVideo')[0].src;
+            break;
+        case 'sample':
+            canStart = true;
+            break;
+    }
+    
+    $('#startButton').prop('disabled', !canStart);
+}
+
+async function startDemo() {
+    if (currentMethod === 'camera') {
+        await startCamera();
+    } else if (currentMethod === 'video') {
+        await startVideo();
+    } else if (currentMethod === 'sample') {
+        // Örnek veri için form submit
+        $('#sampleForm').submit();
+    }
+}
+
+async function startCamera() {
+    try {
+        videoStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { width: 640, height: 480 } 
+        });
+        
+        const video = document.getElementById('videoElement');
+        video.srcObject = videoStream;
+        
+        // UI güncelle
+        $('#startButton').prop('disabled', true);
+        $('#stopButton').prop('disabled', false);
+        updateStatus('camera-status', 'active', 'Kaydediliyor');
+        
+        // Frame yakalama başlat
+        frameBuffer = [];
+        recordingStartTime = Date.now();
+        isProcessing = true;
+        startFrameCapture();
+        
+        TID.showToast('Başarılı', 'Kamera kaydı başlatıldı - İşaret yapmaya başlayın', 'success', 4000);
+        
+    } catch (error) {
+        console.error('Kamera erişim hatası:', error);
+        TID.showToast('Hata', 'Kamera erişimi reddedildi veya mevcut değil', 'error');
+        updateStatus('camera-status', 'error', 'Hata');
+    }
+}
+
+async function startVideo() {
+    console.log('=== startVideo ÇAĞRILDI ===');
+    
+    const video = document.getElementById('uploadedVideo');
+    const fileInput = document.getElementById('videoFileInput');
+    
+    console.log('Video element:', video);
+    console.log('Video src:', video ? video.src : 'YOK');
+    console.log('Video paused:', video ? video.paused : 'YOK');
+    console.log('FileInput:', fileInput);
+    console.log('Files:', fileInput ? fileInput.files : 'YOK');
+    
+    if (!video || !video.src || !fileInput || !fileInput.files[0]) {
+        console.warn('❌ Video veya dosya bulunamadı!');
+        TID.showToast('Uyarı', 'Lütfen önce bir video yükleyin', 'warning', 2000);
+        return;
+    }
+    
+    console.log('✅ Video ve dosya mevcut, devam ediliyor...');
+    
+    // UI güncelle
+    $('#startButton').prop('disabled', true);
+    $('#stopButton').prop('disabled', false);
+    updateStatus('video-status', 'active', 'İşleniyor');
+    
+    // ADIM 1: Videoyu oynat
+    console.log('📹 Video oynatılmaya çalışılıyor...');
+    video.currentTime = 0;
+    
+    try {
+        await video.play();
+        console.log('✅ Video BAŞARIYLA oynatılıyor!');
+        TID.showToast('Bilgi', 'Video oynatılıyor ve işleniyor...', 'info', 2000);
+    } catch(err) {
+        console.log('⚠️ Oynatma hatası, sessiz mod deneniyor:', err);
+        video.muted = true;
+        try {
+            await video.play();
+            console.log('✅ Video sessiz olarak oynatılıyor');
+        } catch(err2) {
+            console.log('❌ Sessiz oynatma da başarısız:', err2);
+        }
+    }
+    
+    // ADIM 2: API'ye gönder
+    try {
+        const file = fileInput.files[0];
+        const formData = new FormData();
+        formData.append('video', file);
+        formData.append('provider', $('#provider').val() || 'gemini');
+        formData.append('use_llm', 'true');  // LLM aktif
+        
+        const response = await fetch('/api/process_video', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            displayResults(result);
+            TID.showToast('Başarılı', 'Video başarıyla işlendi', 'success', 3000);
+            updateStatus('video-status', 'active', 'Tamamlandı');
+        } else {
+            throw new Error(result.error || 'İşleme hatası');
+        }
+        
+    } catch (error) {
+        console.error('Video işleme hatası:', error);
+        TID.showToast('Hata', error.message, 'error');
+        updateStatus('video-status', 'error', 'Hata');
+    } finally {
+        $('#startButton').prop('disabled', false);
+        $('#stopButton').prop('disabled', true);
+    }
+}
+
+async function stopDemo() {
+    isProcessing = false;
+    
+    if (currentMethod === 'camera' && frameBuffer.length > 0) {
+        // Kamera kayıtı durduruldu, frame'leri işle
+        TID.showToast('Bilgi', 'Kayıt tamamlandı, işleniyor...', 'info', 3000);
+        
+        try {
+            const provider = $('#provider').val();
+            
+            const response = await fetch('/api/process_frames', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    frames: frameBuffer,
+                    provider: provider
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Frame işleme hatası');
+            }
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                displayResults(result);
+                TID.showToast('Başarılı', 'Kamera kaydı başarıyla işlendi', 'success', 3000);
+            } else {
+                throw new Error(result.error || 'Bilinmeyen hata');
+            }
+            
+        } catch (error) {
+            console.error('Frame işleme hatası:', error);
+            TID.showToast('Hata', 'Kayıt işlenirken hata oluştu: ' + error.message, 'error');
+        }
+    }
+    
+    // Kamera temizliği
+    if (videoStream) {
+        videoStream.getTracks().forEach(track => track.stop());
+        videoStream = null;
+    }
+    
+    // Video duraklatma
+    const video = document.getElementById('uploadedVideo');
+    if (video && currentMethod === 'video') {
+        video.pause();
+        updateStatus('video-status', 'warning', 'Durduruldu');
+        TID.showToast('Bilgi', 'Video durduruldu', 'info', 2000);
+    }
+    
+    // Buffer temizliği
+    frameBuffer = [];
+    
+    // UI güncelle
+    $('#startButton').prop('disabled', false);
+    $('#stopButton').prop('disabled', true);
+    
+    updateStatus('camera-status', 'warning', 'Durduruldu');
+    updateStatus('video-status', 'warning', 'Duraklatıldı');
+    
+    $('#predictionOverlay').hide();
+    
+    TID.showToast('Bilgi', 'Demo durduruldu', 'info', 2000);
+}
+
+function clearResults() {
+    // Sonuç kartını gizle (sayfa yenilenmesi gerekebilir)
+    $('.result-card').fadeOut();
+    
+    // Video temizleme
+    if (currentMethod === 'video') {
+        const video = document.getElementById('uploadedVideo');
+        const uploadArea = document.getElementById('videoUploadArea');
+        const fileInput = document.getElementById('videoFileInput');
+        
+        if (video) {
+            video.pause();
+            video.src = '';
+            video.style.display = 'none';
+        }
+        
+        if (uploadArea) {
+            uploadArea.style.display = 'block';
+        }
+        
+        if (fileInput) {
+            fileInput.value = '';
+        }
+        
+        updateStatus('video-status', 'warning', 'Video seçin');
+        updateUI();
+    }
+    
+    TID.showToast('Bilgi', 'Sonuçlar temizlendi', 'info', 2000);
+}
+
+function handleVideoUpload() {
+    const file = this.files[0];
+    if (file) {
+        handleVideoFile(file);
+    }
+}
+
+function handleVideoFile(file) {
+    console.log('=== handleVideoFile ÇAĞRILDI ===');
+    console.log('Dosya:', file.name, 'Tip:', file.type, 'Boyut:', (file.size/1024/1024).toFixed(2), 'MB');
+    
+    if (!file.type.startsWith('video/')) {
+        console.error('❌ Geçersiz dosya tipi:', file.type);
+        TID.showToast('Hata', 'Lütfen geçerli bir video dosyası seçin', 'error');
+        return;
+    }
+    
+    const video = document.getElementById('uploadedVideo');
+    const uploadArea = document.getElementById('videoUploadArea');
+    
+    console.log('Video element bulundu:', video);
+    console.log('Upload area bulundu:', uploadArea);
+    
+    // Video src'yi set et
+    const url = URL.createObjectURL(file);
+    console.log('Blob URL oluşturuldu:', url.substring(0, 50) + '...');
+    
+    video.src = url;
+    video.style.display = 'block';
+    video.load(); // Videoyu yükle
+    
+    console.log('Video src atandı ve display=block yapıldı');
+    
+    // Upload alanını gizle
+    if (uploadArea) {
+        uploadArea.style.display = 'none';
+        console.log('Upload area gizlendi');
+    }
+    
+    // Video yüklendiğinde
+    video.onloadedmetadata = function() {
+        console.log('✅ Video metadata yüklendi!');
+        console.log('   Süre:', video.duration.toFixed(1), 'saniye');
+        console.log('   Boyut:', video.videoWidth, 'x', video.videoHeight);
+        console.log('   ReadyState:', video.readyState);
+        
+        updateStatus('video-status', 'active', 'Hazır');
+        updateUI();
+        TID.showToast('Başarılı', `Video yüklendi: ${file.name}`, 'success', 2000);
+    };
+    
+    video.onerror = function() {
+        console.error('❌ Video yükleme hatası!', video.error);
+        TID.showToast('Hata', 'Video yüklenemedi', 'error');
+    };
+}
+
+function updateStatus(elementId, status, text) {
+    const element = $('#' + elementId);
+    const parent = element.parent();
+    
+    element.removeClass('status-active status-warning status-error')
+           .addClass('status-' + status);
+    
+    parent.find('small').text(text);
+}
+
+// Provider seçimini kaydet
+$('#provider').on('change', function() {
+    localStorage.setItem('provider', this.value);
+});
+
+// Kayıtlı provider'ı yükle
+const savedProvider = localStorage.getItem('provider');
+if (savedProvider) {
+    $('#provider').val(savedProvider);
+}
+
+// Frame yakalama fonksiyonları
+function startFrameCapture() {
+    const video = document.getElementById('videoElement');
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    
+    const captureFrame = () => {
+        if (!isProcessing || !video.videoWidth) {
+            if (isProcessing) {
+                requestAnimationFrame(captureFrame);
+            }
+            return;
+        }
+        
+        // Frame'i canvas'a çiz
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Base64'e dönüştür
+        const frameData = canvas.toDataURL('image/jpeg', 0.8);
+        
+        // Frame buffer'a ekle
+        frameBuffer.push(frameData);
+        
+        // Max frame sayısına ulaştıysak eski frame'leri sil
+        if (frameBuffer.length > MAX_FRAMES) {
+            frameBuffer.shift();
+        }
+        
+        // Progress göster
+        const progress = (frameBuffer.length / MAX_FRAMES) * 100;
+        updateFrameProgress(Math.min(progress, 100), frameBuffer.length);
+
+        // Canlı tahmin: buffer dolduysa ve throttle uygunsa gönder
+        const now = Date.now();
+        if (
+            currentMethod === 'camera' &&
+            frameBuffer.length >= MAX_FRAMES &&
+            !isLiveRequestInFlight &&
+            now - lastLiveSentTs > LIVE_SEND_INTERVAL_MS
+        ) {
+            sendLivePrediction();
+            lastLiveSentTs = now;
+        }
+        
+        // 200ms bekle (5 FPS)
+        setTimeout(() => {
+            if (isProcessing) {
+                requestAnimationFrame(captureFrame);
+            }
+        }, 200);
+    };
+    
+    captureFrame();
+}
+
+function updateFrameProgress(percentage, frameCount) {
+    const overlay = $('#predictionOverlay');
+    overlay.show();
+    
+    $('#predictionText').text(`Frame Yakalanıyor: ${frameCount}/${MAX_FRAMES}`);
+    $('#confidenceBar').css('width', percentage + '%');
+    $('#confidenceText').text(`İlerleme: ${Math.round(percentage)}%`);
+}
+
+async function sendLivePrediction() {
+    try {
+        isLiveRequestInFlight = true;
+        const provider = $('#provider').val();
+        const framesToSend = frameBuffer.slice(-MAX_FRAMES);
+
+        const response = await fetch('/api/process_frames', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ frames: framesToSend, provider })
+        });
+
+        if (!response.ok) {
+            throw new Error('Canlı tahmin isteği başarısız');
+        }
+
+        const result = await response.json();
+        if (result && result.success) {
+            const translation = result.result?.translation || '';
+            const conf10 = result.result?.confidence || 0; // 1..10
+            const confPct = Math.min(Math.max((conf10 / 10) * 100, 0), 100);
+
+            if (translation) {
+                $('#predictionText').text(`Canlı Tahmin: ${translation}`);
+                $('#confidenceBar').css('width', confPct + '%');
+                $('#confidenceText').text(`Güven: ${conf10}/10`);
+            }
+        }
+    } catch (err) {
+        console.error('Canlı tahmin hatası:', err);
+    } finally {
+        isLiveRequestInFlight = false;
+    }
+}
+
+function displayResults(result) {
+    // Sonuç alanını dinamik olarak oluştur ve göster
+    const resultHtml = `
+        <div class="card result-card mb-4" style="display: none;">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-language"></i> Çeviri Sonuçları
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6 class="text-primary">Çeviri:</h6>
+                <blockquote class="blockquote">
+                    <p class="fs-6">"${result.result.translation}"</p>
+                </blockquote>
+                
+                <hr>
+                
+                <h6 class="text-muted mb-2">Model Açıklaması:</h6>
+                <p class="text-muted small"><em>${result.result.explanation}</em></p>
+                
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span><strong>Güven Skoru:</strong></span>
+                        <span class="badge bg-${result.result.confidence >= 8 ? 'success' : result.result.confidence >= 6 ? 'warning' : 'danger'}">
+                            ${result.result.confidence}/10
+                        </span>
+                    </div>
+                    <div class="progress mb-3">
+                        <div class="progress-bar" style="width: ${(result.result.confidence / 10) * 100}%"></div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex">
+                        <button class="btn btn-sm btn-outline-success me-md-2" data-feedback="positive">
+                            <i class="fas fa-thumbs-up"></i> Doğru
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" data-feedback="negative">
+                            <i class="fas fa-thumbs-down"></i> Yanlış
+                        </button>
+                    </div>
+                </div>
+                
+                <hr>
+                <small class="text-muted">
+                    <strong>Orijinal:</strong> ${result.original_transcription}
+                </small>
+            </div>
+        </div>
+    `;
+    
+    // Eski sonuç kartını kaldır
+    $('.result-card').remove();
+    
+    // Yeni sonuç kartını yan panele ekle
+    $('.col-lg-4').prepend(resultHtml);
+    
+    // Fade in animasyonu
+    $('.result-card').fadeIn();
+    
+    // Geri bildirim butonlarını yeniden bağla
+    $('[data-feedback]').off('click').on('click', function() {
+        const feedback = $(this).data('feedback');
+        const isPositive = feedback === 'positive';
+        
+        TID.showToast('Teşekkürler', 
+            `${isPositive ? 'Olumlu' : 'Olumsuz'} geri bildiriminiz kaydedildi`, 
+            'success', 3000);
+        
+        // Butonları devre dışı bırak
+        $('[data-feedback]').prop('disabled', true);
+        $(this).removeClass('btn-outline-success btn-outline-danger')
+               .addClass(isPositive ? 'btn-success' : 'btn-danger');
+    });
+}
+
+// Navigasyon state güncelle
+$('.navbar-nav .nav-link[href="/demo"]').addClass('active');
+</script>
+{% endblock %}

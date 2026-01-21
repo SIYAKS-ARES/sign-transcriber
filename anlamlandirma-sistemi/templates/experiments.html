@@ -1,0 +1,789 @@
+{% extends "base.html" %}
+
+{% block title %}TID Anlamlandirma - Deneyler{% endblock %}
+
+{% block extra_css %}
+<style>
+    .experiment-card {
+        border: 2px solid #dee2e6;
+        transition: all 0.3s ease;
+    }
+
+    .experiment-card:hover {
+        border-color: #007bff;
+        box-shadow: 0 4px 15px rgba(0, 123, 255, 0.2);
+    }
+
+    .experiment-card.running {
+        border-color: #ffc107;
+        animation: pulse 1s infinite;
+    }
+
+    .experiment-card.completed {
+        border-color: #28a745;
+    }
+
+    .experiment-card.error {
+        border-color: #dc3545;
+    }
+
+    @keyframes pulse {
+        0% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.7;
+        }
+
+        100% {
+            opacity: 1;
+        }
+    }
+
+    .results-table {
+        font-size: 0.9rem;
+    }
+
+    .results-table th {
+        background-color: #f8f9fa;
+        position: sticky;
+        top: 0;
+    }
+
+    .confidence-badge {
+        min-width: 50px;
+    }
+
+    .summary-stat {
+        text-align: center;
+        padding: 15px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 10px;
+    }
+
+    .summary-stat .value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #007bff;
+    }
+
+    .summary-stat .label {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+
+    .rag-status {
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .rag-status.ready {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
+    }
+
+    .rag-status.not-ready {
+        background-color: #fff3cd;
+        border: 1px solid #ffeeba;
+        color: #856404;
+    }
+
+    /* Manual Input Styles */
+    .error-row {
+        background-color: #fff5f5 !important;
+    }
+
+    .error-row:hover {
+        background-color: #ffe5e5 !important;
+    }
+
+    .btn-copy-prompt {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+    }
+
+    .btn-manual-input {
+        font-size: 0.7rem;
+        padding: 2px 6px;
+    }
+
+    .manual-badge {
+        font-size: 0.65rem;
+        vertical-align: middle;
+    }
+
+    .prompt-preview {
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        padding: 10px;
+        font-family: monospace;
+        font-size: 0.85rem;
+        max-height: 200px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+    }
+
+    .response-textarea {
+        font-family: monospace;
+        font-size: 0.9rem;
+    }
+
+    .provider-tag {
+        font-size: 0.65rem;
+        margin-left: 4px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- Kota Uyarisi -->
+    <div id="quotaWarning" class="alert alert-danger" style="display: none; margin-bottom: 20px;"></div>
+
+    <div class="row">
+        <!-- Controls Panel -->
+        <div class="col-lg-4">
+            <h2><i class="fas fa-flask text-primary"></i> Deney Kontrol Paneli</h2>
+
+            <!-- RAG Status -->
+            <div class="rag-status {{ 'ready' if rag_ready else 'not-ready' }}">
+                <i class="fas {{ 'fa-check-circle' if rag_ready else 'fa-exclamation-triangle' }}"></i>
+                <strong>RAG Sistemi:</strong>
+                {{ 'Hazir' if rag_ready else 'Kulanilamiyor (Fallback Modu)' }}
+            </div>
+
+            <!-- Experiment Settings -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-cog"></i> Deney Ayarlari</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Kelime Sayisi</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="checkbox" class="btn-check" id="word3" value="3" checked>
+                            <label class="btn btn-outline-primary" for="word3">3 Kelime</label>
+
+                            <input type="checkbox" class="btn-check" id="word4" value="4" checked>
+                            <label class="btn btn-outline-primary" for="word4">4 Kelime</label>
+
+                            <input type="checkbox" class="btn-check" id="word5" value="5" checked>
+                            <label class="btn btn-outline-primary" for="word5">5 Kelime</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="provider" class="form-label">LLM Saglayici</label>
+                        <select class="form-select" id="provider">
+                            <option value="gemini" selected>Google Gemini</option>
+                            <option value="openai">OpenAI GPT-4</option>
+                            <option value="claude">Anthropic Claude</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="limit" class="form-label">Ornek Limiti (opsiyonel)</label>
+                        <input type="number" class="form-control" id="limit" min="1" max="20"
+                            placeholder="Tum ornekler">
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="useRag" checked>
+                            <label class="form-check-label" for="useRag">
+                                RAG Sistemi Kullan
+                            </label>
+                        </div>
+                    </div>
+
+                    <button id="runExperimentsBtn" class="btn btn-primary w-100">
+                        <i class="fas fa-play"></i> Deneyleri Baslat
+                    </button>
+                </div>
+            </div>
+
+            <!-- Summary Stats -->
+            <div class="card" id="summaryCard" style="display: none;">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Ozet Istatistikler</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <div class="summary-stat">
+                                <div class="value" id="totalSamples">-</div>
+                                <div class="label">Toplam Ornek</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="summary-stat">
+                                <div class="value" id="successRate">-</div>
+                                <div class="label">Basari Orani</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="summary-stat">
+                                <div class="value" id="avgConfidence">-</div>
+                                <div class="label">Ort. Guven</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="summary-stat">
+                                <div class="value" id="avgLatency">-</div>
+                                <div class="label">Ort. Gecikme</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Panel -->
+        <div class="col-lg-8">
+            <h2><i class="fas fa-table text-success"></i> Deney Sonuclari</h2>
+
+            <!-- Results Tabs -->
+            <ul class="nav nav-tabs" id="resultsTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="word3-tab" data-bs-toggle="tab" data-bs-target="#word3-results">
+                        3 Kelime <span class="badge bg-secondary" id="badge3">-</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="word4-tab" data-bs-toggle="tab" data-bs-target="#word4-results">
+                        4 Kelime <span class="badge bg-secondary" id="badge4">-</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="word5-tab" data-bs-toggle="tab" data-bs-target="#word5-results">
+                        5 Kelime <span class="badge bg-secondary" id="badge5">-</span>
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="resultsTabContent">
+                <div class="tab-pane fade show active" id="word3-results" role="tabpanel">
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-striped results-table" id="table3">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Gloss</th>
+                                    <th>Referans</th>
+                                    <th>Ceviri</th>
+                                    <th>Guven</th>
+                                    <th>Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Deney baslatilmadi</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="word4-results" role="tabpanel">
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-striped results-table" id="table4">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Gloss</th>
+                                    <th>Referans</th>
+                                    <th>Ceviri</th>
+                                    <th>Guven</th>
+                                    <th>Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Deney baslatilmadi</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="word5-results" role="tabpanel">
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-striped results-table" id="table5">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Gloss</th>
+                                    <th>Referans</th>
+                                    <th>Ceviri</th>
+                                    <th>Guven</th>
+                                    <th>Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">Deney baslatilmadi</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Response Input Modal -->
+<div class="modal fade" id="manualInputModal" tabindex="-1" aria-labelledby="manualInputModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="manualInputModalLabel">
+                    <i class="fas fa-keyboard"></i> Manuel LLM Cevabi Girisi
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Current Item Info -->
+                <div class="alert alert-info mb-3">
+                    <strong>Gloss:</strong> <span id="modalGloss" class="font-monospace"></span><br>
+                    <strong>Referans:</strong> <span id="modalReference"></span>
+                </div>
+
+                <!-- Prompt Section -->
+                <div class="mb-3">
+                    <label class="form-label d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-file-alt"></i> LLM'e Gonderilecek Prompt</span>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="copyPromptBtn">
+                            <i class="fas fa-copy"></i> Kopyala
+                        </button>
+                    </label>
+                    <div class="prompt-preview" id="promptPreview">Prompt yukleniyor...</div>
+                </div>
+
+                <!-- Instructions -->
+                <div class="alert alert-secondary mb-3">
+                    <strong><i class="fas fa-info-circle"></i> Kullanim:</strong>
+                    <ol class="mb-0 small">
+                        <li>Yukaridaki promptu kopyalayin</li>
+                        <li>ChatGPT, Gemini veya Claude web arayuzune yapistirun</li>
+                        <li>LLM cevabini asagiya yapistirun</li>
+                        <li>Hangi LLM kullandiginizi secin</li>
+                        <li>"Cevabi Islet" butonuna tiklayin</li>
+                    </ol>
+                </div>
+
+                <!-- Provider Selection -->
+                <div class="mb-3">
+                    <label for="manualProvider" class="form-label">
+                        <i class="fas fa-robot"></i> Kullanilan LLM
+                    </label>
+                    <select class="form-select" id="manualProvider">
+                        <option value="gemini-web">Google Gemini (Web)</option>
+                        <option value="chatgpt-web">ChatGPT (Web)</option>
+                        <option value="claude-web">Claude (Web)</option>
+                        <option value="copilot-web">Microsoft Copilot (Web)</option>
+                        <option value="other">Diger (Belirtiniz)</option>
+                    </select>
+                </div>
+
+                <!-- Other Provider Name -->
+                <div class="mb-3" id="otherProviderDiv" style="display: none;">
+                    <label for="otherProviderName" class="form-label">LLM Adi</label>
+                    <input type="text" class="form-control" id="otherProviderName"
+                        placeholder="Ornegin: Llama 3, Mistral...">
+                </div>
+
+                <!-- Response Input -->
+                <div class="mb-3">
+                    <label for="manualResponse" class="form-label">
+                        <i class="fas fa-paste"></i> LLM Cevabi
+                    </label>
+                    <textarea class="form-control response-textarea" id="manualResponse" rows="10"
+                        placeholder="LLM cevabini buraya yapistirun..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Iptal</button>
+                <button type="button" class="btn btn-success" id="processManualBtn">
+                    <i class="fas fa-check"></i> Cevabi Islet
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast for Copy Notification -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="copyToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header bg-success text-white">
+            <i class="fas fa-check-circle me-2"></i>
+            <strong class="me-auto">Kopyalandi!</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            Prompt panoya kopyalandi. Simdi LLM arayuzune yapistirebilirsiniz.
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let experimentResults = {};
+    let currentManualItem = null;  // Stores current item being manually processed
+
+    $(document).ready(function () {
+        $('#runExperimentsBtn').click(runExperiments);
+        $('#copyPromptBtn').click(copyPromptToClipboard);
+        $('#processManualBtn').click(processManualResponse);
+
+        // Show/hide other provider input
+        $('#manualProvider').change(function () {
+            if ($(this).val() === 'other') {
+                $('#otherProviderDiv').show();
+            } else {
+                $('#otherProviderDiv').hide();
+            }
+        });
+    });
+
+    async function runExperiments() {
+        const btn = $('#runExperimentsBtn');
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Calisiyor...');
+
+        const wordCounts = [];
+        if ($('#word3').is(':checked')) wordCounts.push(3);
+        if ($('#word4').is(':checked')) wordCounts.push(4);
+        if ($('#word5').is(':checked')) wordCounts.push(5);
+
+        if (wordCounts.length === 0) {
+            alert('En az bir kelime sayisi secin');
+            btn.prop('disabled', false).html('<i class="fas fa-play"></i> Deneyleri Baslat');
+            return;
+        }
+
+        const provider = $('#provider').val();
+        const limit = $('#limit').val() ? parseInt($('#limit').val()) : null;
+        const useRag = $('#useRag').is(':checked');
+
+        try {
+            const response = await fetch('/api/run_all_experiments', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    provider: provider,
+                    limit: limit,
+                    use_rag: useRag,
+                    word_counts: wordCounts
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                experimentResults = data.results;
+                displayResults(data.results);
+                $('#summaryCard').show();
+            } else {
+                alert('Hata: ' + data.error);
+            }
+
+        } catch (error) {
+            console.error('Experiment error:', error);
+            alert('Deney hatasi: ' + error.message);
+        } finally {
+            btn.prop('disabled', false).html('<i class="fas fa-play"></i> Deneyleri Baslat');
+        }
+    }
+
+    function displayResults(results) {
+        let totalSamples = 0;
+        let totalSuccessful = 0;
+        let totalConfidence = 0;
+        let totalLatency = 0;
+
+        for (const [wordCount, batch] of Object.entries(results)) {
+            const tableBody = $(`#table${wordCount} tbody`);
+            tableBody.empty();
+
+            // Kota kontrolu
+            if (batch.results) {
+                const quotaError = batch.results.find(r => r.error && (r.error.includes('429') || r.error.includes('Quota')));
+                if (quotaError) {
+                    $('#quotaWarning').show().text('API kota limiti asildi! Lutfen bekleyin veya farkli bir model/API key kullanin.');
+                }
+            }
+
+            if (batch.results && batch.results.length > 0) {
+                batch.results.forEach((r, i) => {
+                    const hasError = r.error && r.error.length > 0;
+                    const statusClass = hasError ? 'text-danger' : 'text-success';
+                    const statusIcon = hasError ? 'fa-times' : 'fa-check';
+                    const confClass = r.confidence >= 8 ? 'bg-success' : r.confidence >= 6 ? 'bg-warning' : 'bg-danger';
+                    const rowClass = hasError ? 'error-row' : '';
+
+                    // Provider tag for manual entries
+                    const providerTag = r.manual_provider ?
+                        `<span class="badge bg-info provider-tag">${r.manual_provider}</span>` : '';
+
+                    // Action buttons for error rows
+                    // Action buttons
+                    let actionButtons = `
+                        <button class="btn btn-outline-warning btn-manual-input ms-1" 
+                                onclick="openManualInput(${wordCount}, ${i})" 
+                                title="Manuel cevap gir / Duzelt">
+                            <i class="fas fa-keyboard"></i>
+                        </button>
+                    `;
+
+                    if (!hasError) {
+                        // Onay butonu sadece basarili ve hata olmayan durumlarda
+                        actionButtons += `
+                        <button class="btn btn-sm btn-outline-success ms-1" 
+                                onclick="approveTranslation(${wordCount}, ${i})" 
+                                title="Ceviriyi onayla ve VectorDB'ye kaydet">
+                            <i class="fas fa-check-double"></i>
+                        </button>
+                    `;
+                    }
+
+                    // Manual badge for manually entered results
+                    const manualBadge = r.manual_provider ?
+                        `<span class="badge bg-info manual-badge" title="Manuel giris: ${r.manual_provider}">M</span>` : '';
+
+                    tableBody.append(`
+                    <tr class="${rowClass}" data-word-count="${wordCount}" data-index="${i}">
+                        <td>${i + 1}</td>
+                        <td title="${escapeHtml(r.gloss)}">${escapeHtml(r.gloss.substring(0, 25))}${r.gloss.length > 25 ? '...' : ''}</td>
+                        <td title="${escapeHtml(r.reference)}">${escapeHtml(r.reference.substring(0, 20))}${r.reference.length > 20 ? '...' : ''}</td>
+                        <td title="${escapeHtml(r.translation || '')}">${escapeHtml((r.translation || '').substring(0, 25))}${(r.translation || '').length > 25 ? '...' : ''} ${providerTag}</td>
+                        <td><span class="badge ${confClass} confidence-badge">${r.confidence}/10</span> ${manualBadge}</td>
+                        <td class="${statusClass}">
+                            <i class="fas ${statusIcon}"></i>
+                            ${actionButtons}
+                        </td>
+                    </tr>
+                `);
+                });
+            }
+
+            // Update badge
+            $(`#badge${wordCount}`).text(`${batch.successful}/${batch.total_samples}`);
+
+            // Accumulate stats
+            totalSamples += batch.total_samples;
+            totalSuccessful += batch.successful;
+            totalConfidence += batch.avg_confidence * batch.successful;
+            totalLatency += batch.avg_latency_ms * batch.total_samples;
+        }
+
+        // Update summary
+        const successRate = totalSamples > 0 ? (totalSuccessful / totalSamples * 100).toFixed(1) : 0;
+        const avgConf = totalSuccessful > 0 ? (totalConfidence / totalSuccessful).toFixed(1) : 0;
+        const avgLat = totalSamples > 0 ? (totalLatency / totalSamples).toFixed(0) : 0;
+
+        $('#totalSamples').text(totalSamples);
+        $('#successRate').text(successRate + '%');
+        $('#avgConfidence').text(avgConf + '/10');
+        $('#avgLatency').text(avgLat + 'ms');
+    }
+
+    // Open manual input modal for a specific experiment item
+    async function openManualInput(wordCount, index) {
+        const batch = experimentResults[wordCount];
+        if (!batch || !batch.results || !batch.results[index]) {
+            alert('Sonuc bulunamadi');
+            return;
+        }
+
+        const item = batch.results[index];
+        currentManualItem = {
+            wordCount: wordCount,
+            index: index,
+            gloss: item.gloss,
+            reference: item.reference
+        };
+
+        // Update modal content
+        $('#modalGloss').text(item.gloss);
+        $('#modalReference').text(item.reference);
+        $('#promptPreview').text('Prompt yukleniyor...');
+        $('#manualResponse').val('');
+        $('#manualProvider').val('gemini-web');
+        $('#otherProviderDiv').hide();
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('manualInputModal'));
+        modal.show();
+
+        // Fetch the prompt for this gloss
+        try {
+            const response = await fetch('/api/get_prompt', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gloss: item.gloss,
+                    use_rag: $('#useRag').is(':checked')
+                })
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                currentManualItem.prompt = data.prompt;
+                $('#promptPreview').text(data.prompt);
+            } else {
+                $('#promptPreview').text('Prompt olusturulamadi: ' + data.error);
+            }
+        } catch (error) {
+            $('#promptPreview').text('Hata: ' + error.message);
+        }
+    }
+
+    // Copy prompt to clipboard
+    function copyPromptToClipboard() {
+        const prompt = $('#promptPreview').text();
+
+        if (!prompt || prompt.includes('yukleniyor') || prompt.includes('Hata')) {
+            alert('Kopyalanacak gecerli prompt yok');
+            return;
+        }
+
+        navigator.clipboard.writeText(prompt).then(() => {
+            // Show toast notification
+            const toast = new bootstrap.Toast(document.getElementById('copyToast'));
+            toast.show();
+        }).catch(err => {
+            // Fallback for older browsers
+            const textarea = document.createElement('textarea');
+            textarea.value = prompt;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+
+            const toast = new bootstrap.Toast(document.getElementById('copyToast'));
+            toast.show();
+        });
+    }
+
+    // Process manually entered LLM response
+    async function processManualResponse() {
+        const response = $('#manualResponse').val().trim();
+
+        if (!response) {
+            alert('Lutfen LLM cevabini girin');
+            return;
+        }
+
+        if (!currentManualItem) {
+            alert('Islenecek ogesi bulunamadi');
+            return;
+        }
+
+        // Get provider
+        let provider = $('#manualProvider').val();
+        if (provider === 'other') {
+            provider = $('#otherProviderName').val().trim() || 'unknown';
+        }
+
+        const btn = $('#processManualBtn');
+        btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Isleniyor...');
+
+        try {
+            const apiResponse = await fetch('/api/process_manual_response', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gloss: currentManualItem.gloss,
+                    reference: currentManualItem.reference,
+                    llm_response: response,
+                    provider: provider,
+                    word_count: currentManualItem.wordCount,
+                    index: currentManualItem.index
+                })
+            });
+
+            const data = await apiResponse.json();
+
+            if (data.success) {
+                // Update the results
+                const batch = experimentResults[currentManualItem.wordCount];
+                batch.results[currentManualItem.index] = data.result;
+
+                // Recalculate successful count
+                batch.successful = batch.results.filter(r => !r.error || r.error.length === 0).length;
+                batch.avg_confidence = batch.results
+                    .filter(r => !r.error)
+                    .reduce((sum, r) => sum + r.confidence, 0) / Math.max(batch.successful, 1);
+
+                // Refresh display
+                displayResults(experimentResults);
+
+                // Close modal
+                bootstrap.Modal.getInstance(document.getElementById('manualInputModal')).hide();
+
+                // Show success message
+                alert(`Basarili! Ceviri: "${data.result.translation}" (Guven: ${data.result.confidence}/10, LLM: ${provider})`);
+            } else {
+                alert('Hata: ' + data.error);
+            }
+
+        } catch (error) {
+            console.error('Manual processing error:', error);
+            alert('Islem hatasi: ' + error.message);
+        } finally {
+            btn.prop('disabled', false).html('<i class="fas fa-check"></i> Cevabi Islet');
+        }
+    }
+
+    // Ceviriyi onayla ve VectorDB'ye kaydet
+    async function approveTranslation(wordCount, index) {
+        const batch = experimentResults[wordCount];
+        if (!batch || !batch.results || !batch.results[index]) {
+            alert('Sonuc bulunamadi');
+            return;
+        }
+
+        const item = batch.results[index];
+
+        if (!confirm(`Bu ceviriyi onaylamak ve VectorDB'ye kaydetmek istiyor musunuz?\n\nGloss: ${item.gloss}\nCeviri: ${item.translation}`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/approve_translation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    gloss: item.gloss,
+                    translation: item.translation,
+                    reference: item.reference
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert('Ceviri basariyla VectorDB\'ye kaydedildi!');
+                // Satiri isaretle
+                $(`tr[data-word-count="${wordCount}"][data-index="${index}"]`).addClass('table-success');
+            } else {
+                alert('Hata: ' + data.error);
+            }
+        } catch (error) {
+            console.error('Approval error:', error);
+            alert('Onay hatasi: ' + error.message);
+        }
+    }
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+{% endblock %}
