@@ -196,3 +196,8 @@ data-statistics-AULTS/
 
 # Memory Bank
 memory-bank/
+calculate_commits.py
+perform_commits.py
+modified_files.txt
+untracked_files.txt
+RAG-WITH-LANGCHAIN-EXAMPLE/Screenshot 2025-12-24 at 5.36.44 PM.png
