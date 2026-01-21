@@ -1,0 +1,36 @@
+# LGS RAG with LangChain - Conda Environment
+# 
+# Kurulum:
+#   conda env create -f environment.yml
+#   conda activate lgs-rag
+#   pip install -r requirements.txt
+#
+# Guncelleme:
+#   conda env update -f environment.yml --prune
+
+name: lgs-rag
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  # Python
+  - python=3.11
+
+  # Temel Kutuphaneler
+  - pip
+  - numpy>=1.24
+  - pandas>=2.0
+
+  # Manim icin sistem bagimliliklari (C kutuphaneleri)
+  - ffmpeg
+  - cairo
+  - pango
+  - pkg-config
+  - pycairo
+  - pygobject
+
+  # Jupyter
+  - jupyter
+  - ipykernel
+  - notebook
