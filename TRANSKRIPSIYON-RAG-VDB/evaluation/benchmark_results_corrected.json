@@ -1,0 +1,119 @@
+{
+  "metadata": {
+    "model": "gemini-2.5-flash-lite",
+    "date": "2026-01-20T21:50:58.167365",
+    "test_samples": 50,
+    "rag_system": "TID RAG v1.0",
+    "embedding_model": "paraphrase-multilingual-MiniLM-L12-v2",
+    "sozluk_size": 2867,
+    "hafiza_size": 2845
+  },
+  "metrics_all": {
+    "bleu_score": 2.093730795801418,
+    "bertscore_precision": 0.20643356442451477,
+    "bertscore_recall": 0.20062683522701263,
+    "bertscore_f1": 0.20330989360809326,
+    "exact_match_count": 4,
+    "exact_match_rate": 8.0,
+    "average_confidence": 2.38
+  },
+  "metrics_successful": {
+    "sample_count": 12,
+    "bleu_score": 25.506862775189653,
+    "bertscore_precision": 0.8601398468017578,
+    "bertscore_recall": 0.8359451293945312,
+    "bertscore_f1": 0.8471245765686035,
+    "exact_match_count": 8,
+    "exact_match_rate": 66.66666666666666,
+    "semantic_match_count": 8,
+    "semantic_match_rate": 66.66666666666666,
+    "average_confidence": 9.916666666666666
+  },
+  "successful_predictions": [
+    {
+      "gloss": "BEN OKUL GITMEK",
+      "reference": "Okula gidiyorum.",
+      "prediction": "Okula gidiyorum.",
+      "confidence": 10,
+      "alternatives": 3
+    },
+    {
+      "gloss": "SEN YEMEK YEMEK",
+      "reference": "Yemek yiyorsun.",
+      "prediction": "Sen bol bol yedin.",
+      "confidence": 10,
+      "alternatives": 3
+    },
+    {
+      "gloss": "AGAC O UZUN YASAMAK OLMAK",
+      "reference": "Agac uzun yasar.",
+      "prediction": "Ağaç uzun yaşar.",
+      "confidence": 10,
+      "alternatives": 3
+    },
+    {
+      "gloss": "BEN KITAP OKUMAK",
+      "reference": "Kitap okuyorum.",
+      "prediction": "Kitap okuyorum.",
+      "confidence": 10,
+      "alternatives": 3
+    },
+    {
+      "gloss": "ANNE YEMEK PISIRMEK",
+      "reference": "Annem yemek pisirir.",
+      "prediction": "Annem yemek pişiriyor.",
+      "confidence": 10,
+      "alternatives": 3
+    },
+    {
+      "gloss": "COCUK PARK OYNAMAK",
+      "reference": "Cocuk parkta oynuyor.",
+      "prediction": "Çocuk parkta oynuyor.",
+      "confidence": 10,
+      "alternatives": 3
+    },
+    {
+      "gloss": "BABA IS CALISMAK",
+      "reference": "Babam iste calisiyor.",
+      "prediction": "Babam çalışıyor.",
+      "confidence": 9,
+      "alternatives": 3
+    },
+    {
+      "gloss": "BEN KAHVALTI ETMEK",
+      "reference": "Kahvalti ediyorum.",
+      "prediction": "Kahvaltı ediyorum.",
+      "confidence": 10,
+      "alternatives": 3
+    },
+    {
+      "gloss": "SEN NEREYE GITMEK",
+      "reference": "Nereye gidiyorsun?",
+      "prediction": "Nereye gidiyorsun?",
+      "confidence": 10,
+      "alternatives": 3
+    },
+    {
+      "gloss": "BEN YORGUN OLMAK",
+      "reference": "Yorgunum.",
+      "prediction": "Yorgunum.",
+      "confidence": 10,
+      "alternatives": 3
+    },
+    {
+      "gloss": "HAVA SICAK OLMAK",
+      "reference": "Hava sicak.",
+      "prediction": "Hava sıcak oluyor.",
+      "confidence": 10,
+      "alternatives": 3
+    },
+    {
+      "gloss": "BEN CAY ICMEK ISTEMEK",
+      "reference": "Cay icmek istiyorum.",
+      "prediction": "Çay içmek istiyorum.",
+      "confidence": 10,
+      "alternatives": 3
+    }
+  ],
+  "failed_count": 38
+}

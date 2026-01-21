@@ -1,0 +1,35 @@
+{
+  "model": "gemini-2.5-flash-lite",
+  "test_samples": 5,
+  "bleu_score": 31.947155212313625,
+  "bertscore_precision": 0.8638032674789429,
+  "bertscore_recall": 0.8481062650680542,
+  "bertscore_f1": 0.8557245135307312,
+  "predictions": [
+    {
+      "gloss": "BEN OKUL GITMEK",
+      "reference": "Okula gidiyorum.",
+      "prediction": "Okula gidiyorum."
+    },
+    {
+      "gloss": "ANNE YEMEK PISIRMEK",
+      "reference": "Annem yemek pisirir.",
+      "prediction": "Annem yemek pişiriyor."
+    },
+    {
+      "gloss": "HAVA SICAK OLMAK",
+      "reference": "Hava sicak.",
+      "prediction": "Hava sıcak oluyor."
+    },
+    {
+      "gloss": "BEN MUTLU OLMAK",
+      "reference": "Mutluyum.",
+      "prediction": "Mutluyum."
+    },
+    {
+      "gloss": "ARKADAS GELMEK",
+      "reference": "Arkadasim geliyor.",
+      "prediction": "Arkadaş geldi."
+    }
+  ]
+}
