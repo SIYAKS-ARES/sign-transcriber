@@ -180,7 +180,19 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 .DS_Store
-/memory-bank
-/transformer-signlang/backups
+transformer-signlang/backups
 coda.rtf
 ONEMLI_CALISMALAR_ANALIZI.md
+
+TID_Sozluk_Verileri/
+Bosphorus-Sign-Dataset-END-USER-LICENSE-AGREEMENT.pdf
+Bosphorus Sign Dataset END USER LICENSE AGREEMENT.docx
+
+sign-transcriber/ignored
+# Large Data / Generated
+Data/
+TRANSKRIPSIYON-RAG-VDB/vectorstore/
+data-statistics-AULTS/
+
+# Memory Bank
+memory-bank/
