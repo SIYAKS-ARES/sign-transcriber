@@ -1,0 +1,122 @@
+# =============================================================================
+# LGS RAG Soru Uretim Sistemi - Docker Compose
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # RAG API Service
+  # ===========================================================================
+  rag-api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: production
+    container_name: lgs-rag-api
+    ports:
+      - "8000:8000"
+    environment:
+      # LLM Configuration
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4-turbo-preview}
+      
+      # Embedding Configuration
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-emrecan/bert-base-turkish-cased-mean-nli-stsb-tr}
+      
+      # Paths
+      - CONFIGS_PATH=/app/data/configs.json
+      - QUESTIONS_CSV_PATH=/app/data/dataset_ocr_li.csv
+      - VECTORSTORE_PATH=/app/vectorstore
+      
+      # RAG Settings
+      - RETRIEVAL_TOP_K=${RETRIEVAL_TOP_K:-5}
+      - SIMILARITY_THRESHOLD=${SIMILARITY_THRESHOLD:-0.7}
+      - MAX_GENERATION_ATTEMPTS=${MAX_GENERATION_ATTEMPTS:-3}
+      
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+    volumes:
+      # Mount vector store for persistence
+      - rag-vectorstore:/app/vectorstore
+      # Mount data directory
+      - rag-data:/app/data
+      # Mount generated questions
+      - ../data/generated_questions:/app/data/generated_questions
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - rag-network
+
+  # ===========================================================================
+  # Development Service
+  # ===========================================================================
+  rag-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: development
+    container_name: lgs-rag-dev
+    ports:
+      - "8001:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LLM_PROVIDER=openai
+      - LOG_LEVEL=DEBUG
+    volumes:
+      - ../src:/app/src:ro
+      - ../tests:/app/tests:ro
+      - ../scripts:/app/scripts:ro
+      - rag-vectorstore-dev:/app/vectorstore
+    profiles:
+      - dev
+    networks:
+      - rag-network
+
+  # ===========================================================================
+  # Test Runner Service
+  # ===========================================================================
+  rag-test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: development
+    container_name: lgs-rag-test
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-mock-key}
+      - LLM_PROVIDER=openai
+    volumes:
+      - ../src:/app/src:ro
+      - ../tests:/app/tests:ro
+    command: ["pytest", "tests/", "-v", "--tb=short"]
+    profiles:
+      - test
+    networks:
+      - rag-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  rag-vectorstore:
+    driver: local
+  rag-vectorstore-dev:
+    driver: local
+  rag-data:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  rag-network:
+    driver: bridge
+
