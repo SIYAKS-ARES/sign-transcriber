@@ -1,0 +1,136 @@
+{
+  "schema_version": "1.0",
+  "model_version": "lgs-struct-score-v1.0-mock",
+  "created_at": "2025-12-24T10:00:00Z",
+  "threshold": 0.70,
+  "total_combinations": 75,
+  "filtered_combinations": 28,
+  "selection_policy": {
+    "mode": "weighted_sampling",
+    "temperature": 1.0,
+    "alpha": 2.0,
+    "top_k": 20
+  },
+  "combinations": [
+    {
+      "alt_konu": "ebob_ekok",
+      "zorluk": 4,
+      "gorsel_tipi": "sematik",
+      "lgs_skor": 0.92,
+      "rank": 1
+    },
+    {
+      "alt_konu": "ebob_ekok",
+      "zorluk": 3,
+      "gorsel_tipi": "yok",
+      "lgs_skor": 0.89,
+      "rank": 2
+    },
+    {
+      "alt_konu": "carpanlar",
+      "zorluk": 4,
+      "gorsel_tipi": "geometrik_sekil",
+      "lgs_skor": 0.87,
+      "rank": 3
+    },
+    {
+      "alt_konu": "ebob_ekok",
+      "zorluk": 5,
+      "gorsel_tipi": "tablo",
+      "lgs_skor": 0.85,
+      "rank": 4
+    },
+    {
+      "alt_konu": "aralarinda_asal",
+      "zorluk": 3,
+      "gorsel_tipi": "sematik",
+      "lgs_skor": 0.84,
+      "rank": 5
+    },
+    {
+      "alt_konu": "carpanlar",
+      "zorluk": 3,
+      "gorsel_tipi": "yok",
+      "lgs_skor": 0.82,
+      "rank": 6
+    },
+    {
+      "alt_konu": "ebob_ekok",
+      "zorluk": 2,
+      "gorsel_tipi": "resimli",
+      "lgs_skor": 0.80,
+      "rank": 7
+    },
+    {
+      "alt_konu": "aralarinda_asal",
+      "zorluk": 4,
+      "gorsel_tipi": "yok",
+      "lgs_skor": 0.79,
+      "rank": 8
+    },
+    {
+      "alt_konu": "carpanlar",
+      "zorluk": 2,
+      "gorsel_tipi": "sematik",
+      "lgs_skor": 0.78,
+      "rank": 9
+    },
+    {
+      "alt_konu": "ebob_ekok",
+      "zorluk": 4,
+      "gorsel_tipi": "yok",
+      "lgs_skor": 0.77,
+      "rank": 10
+    },
+    {
+      "alt_konu": "aralarinda_asal",
+      "zorluk": 2,
+      "gorsel_tipi": "geometrik_sekil",
+      "lgs_skor": 0.76,
+      "rank": 11
+    },
+    {
+      "alt_konu": "carpanlar",
+      "zorluk": 5,
+      "gorsel_tipi": "tablo",
+      "lgs_skor": 0.75,
+      "rank": 12
+    },
+    {
+      "alt_konu": "ebob_ekok",
+      "zorluk": 3,
+      "gorsel_tipi": "geometrik_sekil",
+      "lgs_skor": 0.74,
+      "rank": 13
+    },
+    {
+      "alt_konu": "aralarinda_asal",
+      "zorluk": 5,
+      "gorsel_tipi": "sematik",
+      "lgs_skor": 0.73,
+      "rank": 14
+    },
+    {
+      "alt_konu": "carpanlar",
+      "zorluk": 4,
+      "gorsel_tipi": "resimli",
+      "lgs_skor": 0.72,
+      "rank": 15
+    },
+    {
+      "alt_konu": "ebob_ekok",
+      "zorluk": 1,
+      "gorsel_tipi": "yok",
+      "lgs_skor": 0.71,
+      "rank": 16
+    },
+    {
+      "alt_konu": "aralarinda_asal",
+      "zorluk": 3,
+      "gorsel_tipi": "yok",
+      "lgs_skor": 0.70,
+      "rank": 17
+    }
+  ]
+}
+

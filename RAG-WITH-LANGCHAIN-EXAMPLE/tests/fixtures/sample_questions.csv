@@ -1,0 +1,17 @@
+Soru_MetniOCR,Alt_Konu,Zorluk,Gorsel_Tipi,Kaynak_Tipi,is_LGS,egitim_agirligi
+"24 ve 36 sayılarının EBOB'u kaçtır?",ebob_ekok,2,yok,baslangic,0,0.3
+"Ali 24 elmayı, Ayşe 36 elmayı eşit gruplara ayırmak istiyor. En fazla kaçar elmalık gruplar oluşturabilirler?",ebob_ekok,3,yok,ornek,1,0.8
+"Bir fabrikanın iki üretim hattı vardır. Birinci hat her 12 dakikada, ikinci hat her 18 dakikada bir ürün üretiyor. İki hat aynı anda ürün ürettiğinde, bir sonraki aynı anda üretim kaç dakika sonra olur?",ebob_ekok,4,sematik,cikmis,1,1.0
+"48 sayısının asal çarpanlarını yazınız.",carpanlar,2,yok,baslangic,0,0.3
+"Bir bahçıvan 60 gül, 84 lale ve 108 papatyayı eşit buketler haline getirmek istiyor. Her bukette aynı tür çiçekler olacak şekilde en fazla kaç buket yapabilir?",carpanlar,4,resimli,ornek,1,0.8
+"72 ile 120 sayılarının ortak asal çarpanları nelerdir?",carpanlar,3,yok,baslangic,0,0.3
+"15 ve 28 sayıları aralarında asal mıdır? Açıklayınız.",aralarinda_asal,2,yok,baslangic,0,0.3
+"Bir öğrenci 35 günde bir kütüphaneye, 21 günde bir spor salonuna gidiyor. İki etkinliği aynı gün yaptığında, bir sonraki aynı gün kaç gün sonra olur?",ebob_ekok,4,tablo,cikmis,1,1.0
+"Aşağıdaki sayı çiftlerinden hangisi aralarında asaldır? A) 12,18 B) 15,35 C) 21,28 D) 8,15",aralarinda_asal,3,yok,ornek,1,0.8
+"126 sayısının pozitif bölenlerinin sayısı kaçtır?",carpanlar,4,geometrik_sekil,ornek,1,0.8
+"Bir market 45 portakal ve 75 elmayı poşetlere eşit olarak dağıtmak istiyor. Buna göre en fazla kaç poşet hazırlanabilir?",ebob_ekok,3,sematik,ornek,1,0.8
+"İki sayının EKOK'u 180, EBOB'u 6 ise bu sayıların çarpımı kaçtır?",ebob_ekok,5,yok,cikmis,1,1.0
+"24, 36 ve 48 sayılarının EBOB'u ile EKOK'u arasındaki fark kaçtır?",ebob_ekok,4,yok,ornek,1,0.8
+"Aralarında asal olan ardışık iki doğal sayının toplamı 25 ise bu sayılar nelerdir?",aralarinda_asal,3,yok,baslangic,0,0.3
+"Bir otobüs durağından her 15 dakikada bir mavi otobüs, her 20 dakikada bir kırmızı otobüs geçiyor. Sabah 08:00'de iki otobüs aynı anda duraktan geçti. İki otobüsün tekrar aynı anda geçeceği en yakın saat kaçtır?",ebob_ekok,4,tablo,cikmis,1,1.0
+
