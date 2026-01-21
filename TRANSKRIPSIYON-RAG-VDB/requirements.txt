@@ -1,0 +1,24 @@
+# TID RAG System Dependencies
+# ============================
+
+# Core RAG
+chromadb>=0.4.0
+sentence-transformers>=2.2.0
+
+# LLM Providers
+openai>=1.0.0
+google-generativeai>=0.3.0
+
+# Evaluation (Academic Metrics)
+sacrebleu>=2.3.0
+bert-score>=0.3.13
+
+# Dashboard
+streamlit>=1.28.0
+
+# Data Processing
+regex>=2023.0.0
+
+# Utilities (likely already installed)
+python-dotenv>=1.0.0
+tqdm>=4.65.0
