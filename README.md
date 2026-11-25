@@ -1,287 +1,189 @@
-# SignTranscriber: Neuro-Symbolic Turkish Sign Language Translation System
+# CODA — Turkish Sign Language Translator (SignTranscriber)
 
-<div align="center">
+**CODA** is a graduation capstone that turns Turkish Sign Language (TİD / TID) video into gloss labels, then translates those glosses into natural Turkish with an LLM plus dual-collection RAG.
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=for-the-badge&logo=python&logoColor=white)
-![TensorFlow](https://img.shields.io/badge/TensorFlow-2.12%2B-FF6F00?style=for-the-badge&logo=tensorflow&logoColor=white)
-![PyTorch](https://img.shields.io/badge/PyTorch-2.0%2B-EE4C2C?style=for-the-badge&logo=pytorch&logoColor=white)
-![MediaPipe](https://img.shields.io/badge/MediaPipe-Holistic-00C853?style=for-the-badge&logo=google&logoColor=white)
-![LangChain](https://img.shields.io/badge/LangChain-RAG-1C3C3C?style=for-the-badge&logo=chainlink&logoColor=white)
-![ChromaDB](https://img.shields.io/badge/ChromaDB-VectorStore-FF4B4B?style=for-the-badge&logo=database&logoColor=white)
-![Status](https://img.shields.io/badge/Status-Production-success?style=for-the-badge)
-
-**"From Visual Perception to Semantic Understanding"**
-
-</div>
+This repository is the public codebase for that pipeline: recognition model, gloss-to-Turkish RAG system, demo app, documentation, and paper drafts.
 
 ---
 
-## Table of Contents
+## Problem
 
-1. [Vision &amp; Philosophy](#-vision--philosophy)
-2. [System Architecture (Neuro-Symbolic)](#-system-architecture-neuro-symbolic)
-3. [The Core Trinity (Components)](#-the-core-trinity-components)
-   * [A. The Eye: Visual Perception (Transformer)](#a-the-eye-visual-perception-transformer)
-   * [B. The Knowledge: Retrieval (Dual-RAG)](#b-the-knowledge-retrieval-dual-rag)
-   * [C. The Brain: Interpretation (LLM + Rules)](#c-the-brain-interpretation-llm--rules)
-4. [Data Ecosystem](#-data-ecosystem)
-   * [Scraping Pipeline](#1-scraping-pipeline)
-   * [Dictionary Structure](#2-dictionary-structure)
-   * [AUTSL Statistics](#3-autsl-statistics)
-5. [Scientific Evolution](#-scientific-evolution)
-6. [Experiments &amp; Benchmarks](#-experiments--benchmarks)
-7. [Directory Map](#-directory-map)
-8. [Installation &amp; Usage](#-installation--usage)
+Turkish Sign Language is not a word-for-word encoding of spoken Turkish. It has its own syntax (often topic–comment / SOV-leaning gloss order), limited morphological marking in gloss transcriptions, and meaning carried by non-manual markers that text glosses omit.
+
+End-to-end neural translation is hard under limited labeled TİD data. CODA therefore splits the problem:
+
+1. **Recognize** signs from video → gloss sequence  
+2. **Translate** gloss → fluent Turkish using retrieval (dictionary + translation memory) and an LLM
 
 ---
 
-## Vision & Philosophy
+## Architecture
 
-**SignTranscriber** is a **Neuro-Symbolic Artificial Intelligence System** designed to bridge the communication gap between the Deaf community and the hearing world.
-
-Sign languages are not word-for-word translations of spoken languages; they are complex, independent linguistic systems with unique typologies. Turkish Sign Language (TID) typically follows a **Subject-Object-Verb (SOV)** order and uses spatial grammar rather than morphological suffixes.
-
-**The Problem:** Purely Neural Machine Translation (NMT) fails due to data scarcity in sign languages.
-**Our Solution:** **Rule-Enhanced Dual-RAG**. We combine:
-
-1. **Neural Networks (The Eye):** To perceive the physical world (hand shapes, body pose).
-2. **Symbolic AI (The Knowledge):** To retrieve explicit linguistic rules and dictionary definitions.
-3. **Generative AI (The Brain):** To synthesize these inputs into fluent, grammatically correct Turkish.
-
----
-
-## System Architecture (Neuro-Symbolic)
-
-Our architecture is a vertical pipeline transforming raw pixels into semantic meaning.
-
-![System Architecture](./TRANSKRIPSIYON-RAG-VDB/mimari.png)
-
-```mermaid
-graph TD
-    subgraph "Perception Layer (Transformer-SignLang)"
-        Input[Video Stream] -->|MediaPipe| Features["Holistic Keypoints (258 Dims)"]
-        Features -->|Temporal Transformer| Gloss["Gloss Sequence: 'BEN OKUL GITMEK'"]
-    end
-
-    subgraph "Retrieval Layer (TRANSKRIPSIYON-RAG-VDB)"
-        Gloss -->|Dual-Retriever| Retrieval
-        subgraph "ChromaDB VectorStore"
-            VDB1[("Episodic Memory: TID_Hafiza")]
-            VDB2[("Semantic Memory: TID_Sozluk")]
-        end
-        VDB1 -.-> Retrieval
-        VDB2 -.-> Retrieval
-    end
-
-    subgraph "Reasoning Layer (Anlamlandirma Sistemi)"
-        Gloss -->|Rule Engine| Preproc[Linguistic Features]
-        Retrieval -->|Chain-of-Thought| LLM["Gemini 2.0 / GPT-4o"]
-        Preproc -->|Chain-of-Thought| LLM
-        LLM -->|Generation| Output["Natural Turkish: 'Okula gidiyorum.'"]
-    end
+```
+Video / camera frames
+        │
+        ▼
+MediaPipe Holistic keypoints (258-dim / frame)
+        │
+        ▼
+Temporal Transformer (226 AUTSL classes)  →  gloss sequence
+        │
+        ▼
+Linguistic preprocessing (tense, negation, question, repetition)
+        │
+        ├──────────────► TID_Sozluk (dictionary retrieval)
+        └──────────────► TID_Hafiza (translation-memory / few-shot)
+        │
+        ▼
+Augmented prompt → LLM (e.g. Gemini) → Turkish sentence(s)
 ```
 
----
+Architecture diagrams in-repo: [`TRANSKRIPSIYON-RAG-VDB/mimari.png`](./TRANSKRIPSIYON-RAG-VDB/mimari.png), [`TRANSKRIPSIYON-RAG-VDB/prompt-pipeline.png`](./TRANSKRIPSIYON-RAG-VDB/prompt-pipeline.png).
 
-## The Core Trinity (Components)
-
-### A. The Eye: Visual Perception (Transformer)
-
-**Directory:** [`transformer-signlang/`](./transformer-signlang/)
-
-This module translates video frames into "Gloss" (sign labels).
-
-* **Feature Extraction:** **MediaPipe Holistic** extracts **258 landmarks** per frame:
-  * **Pose:** 99 dimensions (Body posture).
-  * **Face:** 33 key points (Expressions).
-  * **Hands:** 63 dimensions * 2 hands.
-* **Model Architecture:** **Temporal Transformer Encoder**.
-  * **Layers:** 6 Encoder Blocks.
-  * **Attention Heads:** 8 Multi-Head Attention units.
-  * **Model Dimension:** $d_{model} = 256$.
-  * **Input Sequence:** Fixed length of **200 frames** (padded/truncated).
-* **Dataset:** Trained on **AUTSL** (226 classes).
-* **Performance:** Capable of capturing long-range temporal dependencies that LSTMs miss.
-
-### B. The Knowledge: Retrieval (Dual-RAG)
-
-**Directory:** [`TRANSKRIPSIYON-RAG-VDB/`](./TRANSKRIPSIYON-RAG-VDB/)
-
-The "Memory" of the system, implementing an **Iterative Dictionary-Augmented Generation** strategy.
-Based on **ChromaDB** with `paraphrase-multilingual-MiniLM-L12-v2` embeddings (384-dim).
-
-#### The Dual-Collection Strategy:
-
-1. **Episodic Memory (`TID_Hafiza`):**
-   * Stores ~3000 verified sentence translations.
-   * **Mechanism:** Finds the most semantically similar past translations to use as **Few-Shot Examples**.
-   * *Effect:* "Teaches" the LLM how to conjugate verbs based on previous successes.
-2. **Semantic Memory (`TID_Sozluk`):**
-   * Stores ~3000 dictionary terms with metadata (Noun/Verb, Definition, Example).
-   * **Mechanism:** Retrieves the exact definition of every gloss in the sentence.
-   * *Effect:* Grounds the LLM, preventing hallucinations by providing ground-truth meanings.
-
-### C. The Brain: Interpretation (LLM + Rules)
-
-**Directory:** [`anlamlandirma-sistemi/`](./anlamlandirma-sistemi/)
-
-The "Reasoning Engine" that orchestrates the translation.
-
-1. **Rule-Enhanced Preprocessing (`preprocessor.py`):**
-   * **Deterministic Rules:** Detects Tense (Time words), Negation (`DEGIL`, `YOK`), Questions (`MI`), and Repetition.
-   * **Example:** `ARABA SURMEK SURMEK` -> Detected as "Driving continuously".
-2. **Chain-of-Thought Prompting (`prompt_builder/`):**
-   * Constructs a dynamic prompt containing:
-     * **Persona:** Expert Interpreter.
-     * **Linguistic Rules:** Extracted by the preprocessor.
-     * **Context:** Retrieved from RAG.
-   * **Output:** Structured JSON with Confidence Scores.
-
-![Prompt Pipeline](./TRANSKRIPSIYON-RAG-VDB/prompt-pipeline.png)
+| Stage | Role | Primary location |
+|-------|------|------------------|
+| Recognition | Video → gloss | [`transformer-signlang/`](./transformer-signlang/) |
+| RAG + LLM translation | Gloss → Turkish | [`TRANSKRIPSIYON-RAG-VDB/`](./TRANSKRIPSIYON-RAG-VDB/) |
+| Integrated demo (Flask) | Camera/video UI + model + optional RAG | [`anlamlandirma-sistemi/`](./anlamlandirma-sistemi/) |
 
 ---
 
-## Data Ecosystem
+## Repository structure
 
-### 1. Scraping Pipeline
+Paths below exist in this tree:
 
-**Directory:** [`tid_scraper/`](./tid_scraper/)
-
-* **Target:** TİD Güncel Sözlük (Ministry of Family and Social Services).
-* **Tech:** Selenium + BeautifulSoup.
-* **Output:** Downloads Video (`mp4`), Images (`jpg`), and Metadata (`json`).
-
-### 2. Dictionary Structure
-
-**Directory:** [`TID_Sozluk_Verileri/`](./TID_Sozluk_Verileri/)
-Data is structured for RAG ingestion:
-
-```json
-/* TID_Sozluk_Verileri/Acele/data.json */
-{
-    "kelime": "Acele",
-    "anlamlar": [
-        {
-            "tur": "Sıfat",
-            "aciklama": "Hızlı yapılan, çabuk, tez, ivedi",
-            "ornek": {
-                "transkripsiyon": "BEN ANNE ACELE ACELE",
-                "ceviri": "Annem çok acelecidir."
-            }
-        }
-    ]
-}
+```
+.
+├── transformer-signlang/                 # Temporal Transformer (AUTSL, 226 classes)
+│   ├── train.py, evaluate.py
+│   ├── checkpoints/                      # best_model.pth, last_model.pth
+│   └── results/evaluation_report.json    # test metrics
+├── TRANSKRIPSIYON-RAG-VDB/               # Dual-RAG gloss→Turkish + Streamlit app
+│   ├── pipeline/, retriever/, prompt_builder/, llm/
+│   ├── scripts/init_sozluk.py, init_hafiza.py
+│   ├── evaluation/                       # BLEU / BERTScore artifacts
+│   └── app.py                            # streamlit run app.py
+├── anlamlandirma-sistemi/                # Flask demo (recognition + LLM/RAG)
+│   ├── app.py                            # default http://localhost:5005
+│   ├── rag/, experiments/, models/
+│   └── DEMO_CALISTIRMA.md, DENEY_KILAVUZU.md
+├── transcription-interpretation-system/  # Earlier Flask demo variant
+├── tid_scraper/                          # Scraper for TİD Güncel Sözlük
+├── character-pipeline/                   # Early static hand-shape experiments
+├── RAG-WITH-LANGCHAIN-EXAMPLE/           # LangChain / RAG reference example
+├── Docs/                                 # Design notes (transcription & translation)
+├── makale/                               # Paper / write-up drafts
+├── requirements.txt                      # Root ML/CV dependencies (transformer-oriented)
+├── synthetic_generator.py, validate_grammar.py
+└── LICENSE                               # MIT
 ```
 
-### 3. AUTSL Statistics
-
-**Directory:** [`data-statistics-AULTS/`](./data-statistics-AULTS/)
-
-* **Classes:** 226 distinct signs.
-* **Analysis:** `compute_stats.py` provides reports on class imbalance, missing files, and duplicate checks (pHash).
-* **Signers:** 43 different signers (ensuring generalization).
+Dictionary dump directories such as `TID_Sozluk_Verileri/` are **produced by** `tid_scraper` and are used when initializing ChromaDB; they are not shipped in this repository.
 
 ---
 
-## Scientific Evolution
+## Setup and run
 
-The project evolved through strict R&D phases:
-
-1. **Genesis: The Character Pipeline** (`character-pipeline/`)
-   * *Goal:* Recognize static hand shapes (A-Z letters, Numbers).
-   * *Tech:* Simple CNNs + MediaPipe Hands.
-   * *Result:* Good for spelling, useless for continuous signing.
-2. **Phase 1: LSTM / TID-N** (Archived)
-   * *Goal:* Word-level recognition using temporal sequences.
-   * *Tech:* Bi-LSTM + TCN.
-   * *Result:* Failed on long sequences due to vanishing gradients.
-3. **Phase 2: Transformer (Current Production)**
-   * *Goal:* State-of-the-art Sequence-to-Class classification.
-   * *Tech:* Transformer Encoder + Multi-Head Attention.
-   * *Training Environment:* Trained locally on **Apple M3 Macbook Pro** (Metal Performance Shaders).
-   * *Result:* 90%+ Accuracy on AUTSL test set.
-4. **Future: Bosphorus Fine-Tuning**
-   * *Goal:* Expand vocabulary to ~850 classes using the BosphorusSign dataset.
-   * *Infrastructure Plan:* All future fine-tuning and large-scale training will be conducted on **Google Colab (A100/T4 GPUs)** due to dataset size.
-
----
-
-## Experiments & Benchmarks
-
-We rigorously benchmark using **BLEU** and **BERTScore** metrics (`TRANSKRIPSIYON-RAG-VDB/evaluation`).
-
-| Model Configuration                |   BLEU Score   | BERTScore (F1) | Human Eval (Confidence) |
-| :--------------------------------- | :-------------: | :-------------: | :---------------------: |
-| **Baseline (Zero-Shot LLM)** |      12.4      |      0.65      |         4.5/10         |
-| **RAG (Standard)**           |      18.7      |      0.72      |         7.2/10         |
-| **Rule-Enhanced Dual-RAG**   | **25.51** | **0.847** |    **9.9/10**    |
-
-**Visual Experiments:** (`anlamlandirma-sistemi/experiments`)
-Tests run on 3, 4, and 5-word sentence sets to measure semantic coherence.
-
----
-
-## Directory Map
-
-A guide to the 23+ READMEs in this repository:
-
-* **`anlamlandirma-sistemi/`** (The Brain & UI)
-  * `experiments/`: Benchmark runner & Test sets.
-  * `rag/`: Embedded RAG module.
-  * `vectorstore/`: Local ChromaDB instance.
-* **`TRANSKRIPSIYON-RAG-VDB/`** (The RAG Core & Evaluation)
-  * `evaluation/`: BLEU/BERTScore scripts.
-  * `scripts/`: Database initialization scripts.
-* **`transformer-signlang/`** (The Eye / Model)
-  * `models/`: PyTorch model definitions.
-  * `Data/`: Scalers and processors.
-* **`tid_scraper/`**: Data harvesting tools.
-* **`character-pipeline/`**: Historical hand-shape experiments.
-* **`data-statistics-AULTS/`**: EDA and quality reports.
-
----
-
-## Installation & Usage
-
-### 1. Environment Setup
+Requires **Python 3.10+** (3.9+ for the RAG package). Create a virtualenv, then install the module(s) you need.
 
 ```bash
-git clone https://github.com/siyaksares/sign-transcriber.git
+git clone https://github.com/SIYAKS-ARES/sign-transcriber.git
 cd sign-transcriber
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate   # Windows: venv\Scripts\activate
 ```
 
-### 2. Install Dependencies
+### A) Integrated demo (recognition + translation UI)
 
 ```bash
-pip install -r anlamlandirma-sistemi/requirements.txt
-pip install -r transformer-signlang/requirements.txt
-```
-
-### 3. Initialize RAG Memory
-
-```bash
-cd TRANSKRIPSIYON-RAG-VDB
-python scripts/init_sozluk.py  # Builds Dictionary DB
-python scripts/init_hafiza.py  # Builds Translation Memory
-```
-
-### 4. Run the Full System (Demo)
-
-```bash
-cd ../anlamlandirma-sistemi
+cd anlamlandirma-sistemi
+pip install -r requirements.txt
+# Set at least one LLM key (loaded via python-dotenv / environment):
 export GEMINI_API_KEY="your_key"
 python app.py
 ```
 
-Visit **`http://localhost:5005`** for the interactive dashboard.
+Open `http://localhost:5005/` (demo: `/demo`). Host/port: `HOST` / `PORT` (default `0.0.0.0:5005`).
+
+### B) Gloss→Turkish RAG system (standalone)
+
+```bash
+cd TRANSKRIPSIYON-RAG-VDB
+pip install -r requirements.txt
+# Build Chroma collections (needs local dictionary data; see tid_scraper)
+python scripts/init_sozluk.py
+python scripts/init_hafiza.py
+export GOOGLE_API_KEY="your_key"   # or OPENAI_API_KEY
+streamlit run app.py
+```
+
+### C) Train / evaluate the recognition model
+
+```bash
+cd transformer-signlang
+pip install -r requirements.txt
+# AUTSL-style video + label layout required for training; see that folder's README
+python train.py
+python evaluate.py
+```
+
+Optional: root [`requirements.txt`](./requirements.txt) covers core PyTorch / MediaPipe deps used by the transformer stack.
 
 ---
 
-<div align="center">
+## Results
 
-**SignTranscriber**
-*Breaking Barriers with Neuro-Symbolic AI*
+Figures below are taken from artifacts in this repository. They are not inflated.
 
-</div>
+### Sign recognition (Transformer)
+
+Source: [`transformer-signlang/results/evaluation_report.json`](./transformer-signlang/results/evaluation_report.json)
+
+| Metric | Value |
+|--------|-------|
+| Test accuracy | **76.96%** (`0.7696`) |
+| Macro F1 | 0.762 |
+| Weighted F1 | 0.764 |
+| Classes | 226 (AUTSL) |
+| Test samples (support sum) | 3,742 |
+
+Supporting plots/CSVs live under [`transformer-signlang/results/`](./transformer-signlang/results/).
+
+### Gloss→Turkish (Dual-RAG + LLM)
+
+Sources: [`TRANSKRIPSIYON-RAG-VDB/evaluation/benchmark_results_corrected.json`](./TRANSKRIPSIYON-RAG-VDB/evaluation/benchmark_results_corrected.json), [`full_benchmark_results.json`](./TRANSKRIPSIYON-RAG-VDB/evaluation/full_benchmark_results.json), [`BENCHMARK_REPORT_EN.md`](./TRANSKRIPSIYON-RAG-VDB/evaluation/BENCHMARK_REPORT_EN.md)
+
+**Caveat:** The test set has **50** gloss–reference pairs. API rate limiting meant only **12 of 50** cases produced successful translations. Headline BLEU / BERTScore numbers below are computed on those **12 successful** outputs only. Metrics over all 50 (failures counted as empty/failed) are much lower.
+
+| Scope | Samples | BLEU | BERTScore F1 | Exact match | Avg. confidence |
+|-------|---------|------|--------------|-------------|-----------------|
+| Successful only (`benchmark_results_corrected.json`) | **12 / 50** | **25.51** | **0.847** | 66.7% | 9.92 / 10 |
+| Full set including failures (`full_benchmark_results.json`) | 50 | 2.09 | 0.203 | 8.0% | 2.38 / 10 |
+
+Model recorded in the artifacts: `gemini-2.5-flash-lite`. Collections sized at evaluation time: Sozluk 2,867 · Hafiza 2,845.
+
+---
+
+## Documentation and paper drafts
+
+| Resource | Path |
+|----------|------|
+| Transcription system design notes | [`Docs/Gemini-1-Isaret-Dili-Transkripsiyon-Sistemi-Tasarimi.md`](./Docs/Gemini-1-Isaret-Dili-Transkripsiyon-Sistemi-Tasarimi.md) |
+| Translation experimental design notes | [`Docs/Gemini-2-Isaret-Dili-Ceviri-Sistemi-Deneysel-Kurgusu.md`](./Docs/Gemini-2-Isaret-Dili-Ceviri-Sistemi-Deneysel-Kurgusu.md) |
+| Prompt notes | [`Docs/Prompts/`](./Docs/Prompts/) |
+| Paper / write-up drafts | [`makale/`](./makale/) (see [`makale/master.md`](./makale/master.md)) |
+| RAG benchmark reports | [`TRANSKRIPSIYON-RAG-VDB/evaluation/BENCHMARK_REPORT_EN.md`](./TRANSKRIPSIYON-RAG-VDB/evaluation/BENCHMARK_REPORT_EN.md), [`BENCHMARK_RAPORU.md`](./TRANSKRIPSIYON-RAG-VDB/evaluation/BENCHMARK_RAPORU.md) |
+| Demo / experiment guides | [`anlamlandirma-sistemi/DEMO_CALISTIRMA.md`](./anlamlandirma-sistemi/DEMO_CALISTIRMA.md), [`DENEY_KILAVUZU.md`](./anlamlandirma-sistemi/DENEY_KILAVUZU.md) |
+
+Module-level READMEs under each top-level folder go deeper on APIs and file layouts.
+
+---
+
+## Acknowledgements
+
+- **AUTSL** — isolated sign recognition dataset used for the 226-class Transformer evaluation  
+- **TİD Güncel Sözlük** (Republic of Türkiye, Ministry of Family and Social Services) — dictionary content harvested via [`tid_scraper/`](./tid_scraper/) for RAG collections  
+- **MediaPipe Holistic** — pose, face, and hand keypoints  
+- **ChromaDB** and **sentence-transformers** (`paraphrase-multilingual-MiniLM-L12-v2`) — vector retrieval  
+
+Licensed under the [MIT License](./LICENSE). Copyright (c) 2025 Mehmet Said Hüseyinoğlu.
